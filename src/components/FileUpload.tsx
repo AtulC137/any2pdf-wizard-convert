@@ -4,6 +4,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Loader2, Upload, FileText, Download, X, Check } from 'lucide-react';
+import { toast } from '@/components/ui/sonner';
 
 interface FileUploadProps {
   id: string;
@@ -15,8 +16,9 @@ const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
   const [isConverting, setIsConverting] = useState(false);
   const [conversionProgress, setConversionProgress] = useState(0);
   const [isConverted, setIsConverted] = useState(false);
+  const [convertedFileUrl, setConvertedFileUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
+  const { toast: uiToast } = useToast();
 
   const allowedFileTypes = [
     'application/msword',
@@ -60,17 +62,14 @@ const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
     );
     
     if (validFiles.length !== droppedFiles.length) {
-      toast({
-        title: "Invalid file type",
-        description: "Please upload only documents, spreadsheets, images, HTML, or text files.",
-        variant: "destructive"
-      });
+      toast.error("Invalid file type. Please upload only documents, spreadsheets, images, HTML, or text files.");
     }
     
     if (validFiles.length > 0) {
       setFiles(prevFiles => [...prevFiles, ...validFiles]);
+      setIsConverted(false);
     }
-  }, [toast]);
+  }, []);
 
   const handleFileSelect = () => {
     fileInputRef.current?.click();
@@ -91,15 +90,12 @@ const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
     );
     
     if (validFiles.length !== selectedFiles.length) {
-      toast({
-        title: "Invalid file type",
-        description: "Please upload only documents, spreadsheets, images, HTML, or text files.",
-        variant: "destructive"
-      });
+      toast.error("Invalid file type. Please upload only documents, spreadsheets, images, HTML, or text files.");
     }
     
     if (validFiles.length > 0) {
       setFiles(prevFiles => [...prevFiles, ...validFiles]);
+      setIsConverted(false);
     }
     
     // Clear the input to allow selecting the same file again
@@ -109,55 +105,83 @@ const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
   const removeFile = (index: number) => {
     setFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
     setIsConverted(false);
+    setConvertedFileUrl(null);
   };
 
-  const handleConvert = () => {
+  const handleConvert = async () => {
     if (files.length === 0) {
-      toast({
-        title: "No files selected",
-        description: "Please upload at least one file to convert.",
-        variant: "destructive"
-      });
+      toast.error("Please upload at least one file to convert.");
       return;
     }
 
     setIsConverting(true);
     setConversionProgress(0);
 
-    // Mock conversion process with setTimeout
-    const interval = setInterval(() => {
-      setConversionProgress(prev => {
-        const newProgress = prev + 10;
-        if (newProgress >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            setIsConverting(false);
-            setIsConverted(true);
-            toast({
-              title: "Conversion complete!",
-              description: "Your PDF is ready to download.",
-              variant: "default"
-            });
-          }, 500);
-          return 100;
-        }
-        return newProgress;
+    try {
+      // Start progress simulation
+      const progressInterval = setInterval(() => {
+        setConversionProgress(prev => {
+          const newProgress = prev + 10;
+          return newProgress < 90 ? newProgress : prev;
+        });
+      }, 300);
+
+      // For each file, create a FormData object to send to the Supabase Edge Function
+      const formData = new FormData();
+      files.forEach((file, index) => {
+        formData.append(`file-${index}`, file);
       });
-    }, 300);
+
+      // Call our Supabase Edge Function (URL will be provided after creating the function)
+      const response = await fetch('https://YOUR_SUPABASE_PROJECT_URL/functions/v1/convert-to-pdf', {
+        method: 'POST',
+        body: formData,
+      });
+
+      clearInterval(progressInterval);
+
+      if (!response.ok) {
+        throw new Error(`Conversion failed: ${response.statusText}`);
+      }
+
+      // Get the PDF blob from the response
+      const pdfBlob = await response.blob();
+      
+      // Create a URL for the blob
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      setConvertedFileUrl(pdfUrl);
+      
+      // Set conversion state to complete
+      setConversionProgress(100);
+      setTimeout(() => {
+        setIsConverting(false);
+        setIsConverted(true);
+        toast.success("Conversion complete! Your PDF is ready to download.");
+      }, 500);
+      
+    } catch (error) {
+      console.error("Conversion error:", error);
+      toast.error("Error converting files. Please try again.");
+      setIsConverting(false);
+    }
   };
 
   const handleDownload = () => {
-    // Create a mock PDF download experience
-    toast({
-      title: "Downloading PDF",
-      description: "Your file would be downloading if this were connected to a backend.",
-    });
+    if (convertedFileUrl) {
+      const link = document.createElement('a');
+      link.href = convertedFileUrl;
+      link.download = "converted-document.pdf";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   const handleReset = () => {
     setFiles([]);
     setIsConverted(false);
     setConversionProgress(0);
+    setConvertedFileUrl(null);
   };
 
   return (
