@@ -17,26 +17,31 @@ const BackendSetup: React.FC = () => {
               <h2>Setting up the Supabase Edge Function for PDF Conversion</h2>
               
               <p>
-                To enable the PDF conversion functionality, you'll need to create a Supabase Edge Function 
-                that handles converting various file formats to PDF. Here's how to set it up:
+                You're almost there! To enable the PDF conversion functionality, deploy the Edge Function 
+                to your Supabase project. Here's how:
               </p>
               
-              <h3>Step 1: Create a New Edge Function</h3>
+              <h3>Step 1: Set up your local environment</h3>
               <p>
-                In your Supabase dashboard, navigate to Edge Functions and create a new function called 
-                "convert-to-pdf".
+                First, install the Supabase CLI if you haven't already:
               </p>
-              
-              <h3>Step 2: Install Required Dependencies</h3>
               <pre>
                 <code>
-                  {`npm install @supabase/supabase-js pdftron multiparty`}
+                  {`npm install -g supabase`}
                 </code>
               </pre>
               
-              <h3>Step 3: Implement the Conversion Logic</h3>
+              <h3>Step 2: Create the Edge Function directory</h3>
+              <pre>
+                <code>
+                  {`mkdir -p supabase/functions/convert-to-pdf
+cd supabase/functions/convert-to-pdf`}
+                </code>
+              </pre>
+              
+              <h3>Step 3: Create the Edge Function file</h3>
               <p>
-                Here's a sample implementation for your Edge Function:
+                Create a file named 'index.ts' in the convert-to-pdf directory with the following content:
               </p>
               
               <pre>
@@ -48,32 +53,55 @@ import { PDFNet } from 'https://esm.sh/pdftron';
 import * as multiparty from 'https://esm.sh/multiparty';
 
 serve(async (req) => {
-  // Handle multipart form data
-  const formData = await req.formData();
-  const files = [];
-  
-  // Extract files from form data
-  for (const entry of formData.entries()) {
-    if (entry[0].startsWith('file-')) {
-      const file = entry[1];
-      files.push({
-        name: file.name,
-        type: file.type,
-        data: await file.arrayBuffer()
+  try {
+    // Enable CORS
+    if (req.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+        }
       });
     }
-  }
-  
-  if (files.length === 0) {
-    return new Response(
-      JSON.stringify({ error: 'No files uploaded' }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
-    );
-  }
-  
-  try {
-    // Initialize PDFTron SDK
-    await PDFNet.initialize();
+    
+    // Handle multipart form data
+    const formData = await req.formData();
+    const files = [];
+    
+    // Extract files from form data
+    for (const entry of formData.entries()) {
+      if (entry[0].startsWith('file-')) {
+        const file = entry[1];
+        files.push({
+          name: file.name,
+          type: file.type,
+          data: await file.arrayBuffer()
+        });
+      }
+    }
+    
+    if (files.length === 0) {
+      return new Response(
+        JSON.stringify({ error: 'No files uploaded' }),
+        { 
+          status: 400, 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*' 
+          } 
+        }
+      );
+    }
+    
+    // Initialize PDFTron SDK with license key
+    const pdftronLicense = Deno.env.get('PDFTRON_LICENSE_KEY');
+    if (pdftronLicense) {
+      await PDFNet.initialize(pdftronLicense);
+    } else {
+      await PDFNet.initialize();
+    }
     
     // Create a new PDF document
     const doc = await PDFNet.PDFDoc.create();
@@ -119,44 +147,46 @@ serve(async (req) => {
     return new Response(docBuffer, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': 'attachment; filename=converted-document.pdf'
+        'Content-Disposition': 'attachment; filename=converted-document.pdf',
+        'Access-Control-Allow-Origin': '*'
       }
     });
   } catch (error) {
     console.error('PDF conversion error:', error);
     return new Response(
-      JSON.stringify({ error: 'Failed to convert to PDF' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: 'Failed to convert to PDF', details: error.message }),
+      { 
+        status: 500, 
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*' 
+        } 
+      }
     );
   }
 });`}
                 </code>
               </pre>
               
-              <h3>Step 4: Deploy the Function</h3>
+              <h3>Step 4: Deploy the Edge Function</h3>
               <p>
-                Deploy the Edge Function using the Supabase CLI:
+                Now, deploy the function to your Supabase project:
               </p>
               <pre>
                 <code>
-                  {`supabase functions deploy convert-to-pdf --project-ref your-project-ref`}
+                  {`supabase functions deploy convert-to-pdf --project-ref weqtpuyuizhoydheyheo`}
                 </code>
               </pre>
               
-              <h3>Step 5: Set Environment Variables</h3>
+              <h3>Step 5: Set Environment Variables (Optional for PDFTron license)</h3>
               <p>
-                In your Supabase dashboard, set these environment variables for your Edge Function:
+                If you're using PDFTron with a license key, set it using:
               </p>
-              <ul>
-                <li>
-                  <code>PDFTRON_LICENSE_KEY</code>: Your PDFTron license key
-                </li>
-              </ul>
-              
-              <h3>Step 6: Update the Frontend Code</h3>
-              <p>
-                In the FileUpload.tsx component, replace 'YOUR_SUPABASE_PROJECT_URL' with your actual Supabase project URL.
-              </p>
+              <pre>
+                <code>
+                  {`supabase secrets set PDFTRON_LICENSE_KEY=your-license-key --project-ref weqtpuyuizhoydheyheo`}
+                </code>
+              </pre>
               
               <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 my-4">
                 <div className="flex">
@@ -167,20 +197,32 @@ serve(async (req) => {
                   </div>
                   <div className="ml-3">
                     <p className="text-sm text-yellow-700">
-                      Note: The PDFTron SDK requires a license for commercial use. You can get a trial license or consider alternative PDF conversion libraries like pdf-lib or jsPDF for simpler conversions.
+                      Note: The PDFTron SDK requires a license for commercial use. For simpler needs, you may consider using alternative libraries like pdf-lib or jsPDF.
                     </p>
                   </div>
                 </div>
               </div>
+              
+              <h3>Step 6: Test Your Edge Function</h3>
+              <p>
+                The frontend has been updated to use your Supabase project URL. Test the conversion by uploading files through the application.
+              </p>
+              
+              <h3>Troubleshooting</h3>
+              <ul>
+                <li>Check the function logs in your Supabase dashboard under Functions > Logs</li>
+                <li>Ensure CORS is properly configured (included in the function code above)</li>
+                <li>Verify that the file formats you're trying to convert are supported</li>
+              </ul>
             </div>
             
             <div className="flex justify-center">
               <Button onClick={() => window.history.back()} variant="outline" className="mr-4">
                 Go Back
               </Button>
-              <a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer">
+              <a href="https://supabase.com/dashboard/project/weqtpuyuizhoydheyheo/functions" target="_blank" rel="noopener noreferrer">
                 <Button className="bg-any2pdf-teal hover:bg-any2pdf-dark">
-                  Go to Supabase Dashboard
+                  Go to Supabase Functions
                 </Button>
               </a>
             </div>
