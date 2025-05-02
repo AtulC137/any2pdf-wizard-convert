@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useRef } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
@@ -62,7 +61,11 @@ const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
     );
     
     if (validFiles.length !== droppedFiles.length) {
-      toast.error("Invalid file type. Please upload only documents, spreadsheets, images, HTML, or text files.");
+      toast({
+        variant: "destructive",
+        title: "Invalid File Type",
+        description: "Please upload only documents, spreadsheets, images, HTML, or text files."
+      });
     }
     
     if (validFiles.length > 0) {
@@ -90,7 +93,11 @@ const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
     );
     
     if (validFiles.length !== selectedFiles.length) {
-      toast.error("Invalid file type. Please upload only documents, spreadsheets, images, HTML, or text files.");
+      toast({
+        variant: "destructive",
+        title: "Invalid File Type",
+        description: "Please upload only documents, spreadsheets, images, HTML, or text files."
+      });
     }
     
     if (validFiles.length > 0) {
