@@ -4,7 +4,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Loader2, Upload, FileText, Download, X, Check } from 'lucide-react';
-import { toast } from '@/components/ui/sonner';
+import { toast } from '@/components/ui/use-toast';
 
 interface FileUploadProps {
   id: string;
@@ -110,7 +110,11 @@ const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
 
   const handleConvert = async () => {
     if (files.length === 0) {
-      toast.error("Please upload at least one file to convert.");
+      toast({
+        variant: "destructive",
+        title: "No files selected",
+        description: "Please upload at least one file to convert."
+      });
       return;
     }
 
@@ -126,12 +130,17 @@ const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
         });
       }, 300);
 
+      console.log("Starting file conversion. Files to convert:", files.map(f => ({ name: f.name, type: f.type, size: f.size })));
+
       // For each file, create a FormData object to send to the Supabase Edge Function
       const formData = new FormData();
       files.forEach((file, index) => {
         formData.append(`file-${index}`, file);
+        console.log(`Added file to FormData: ${file.name} (${file.type}, ${file.size} bytes)`);
       });
 
+      console.log("Sending request to Supabase Edge Function...");
+      
       // Using your deployed Supabase Edge Function
       const response = await fetch('https://weqtpuyuizhoydheyheo.supabase.co/functions/v1/convert-to-pdf', {
         method: 'POST',
@@ -140,12 +149,24 @@ const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
 
       clearInterval(progressInterval);
 
+      console.log("Response received:", response.status, response.statusText);
+      
       if (!response.ok) {
-        throw new Error(`Conversion failed: ${response.statusText}`);
+        // Try to get more error details if available
+        let errorData;
+        try {
+          errorData = await response.json();
+          console.error("Error details:", errorData);
+        } catch (e) {
+          console.error("Could not parse error response:", e);
+        }
+        
+        throw new Error(`Conversion failed: ${response.status} ${response.statusText}${errorData ? ' - ' + JSON.stringify(errorData) : ''}`);
       }
 
       // Get the PDF blob from the response
       const pdfBlob = await response.blob();
+      console.log("PDF blob received:", pdfBlob.size, "bytes,", pdfBlob.type);
       
       // Create a URL for the blob
       const pdfUrl = URL.createObjectURL(pdfBlob);
@@ -156,12 +177,19 @@ const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
       setTimeout(() => {
         setIsConverting(false);
         setIsConverted(true);
-        toast.success("Conversion complete! Your PDF is ready to download.");
+        toast({
+          title: "Success!",
+          description: "Conversion complete! Your PDF is ready to download.",
+        });
       }, 500);
       
     } catch (error) {
       console.error("Conversion error:", error);
-      toast.error("Error converting files. Please try again.");
+      toast({
+        variant: "destructive",
+        title: "Conversion Failed",
+        description: error instanceof Error ? error.message : "Error converting files. Please try again."
+      });
       setIsConverting(false);
     }
   };
