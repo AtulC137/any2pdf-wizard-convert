@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useRef } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,9 @@ import { toast } from '@/components/ui/use-toast';
 interface FileUploadProps {
   id: string;
 }
+
+// Supabase anon key - this is safe to expose in the client
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlcXRwdXl1aXpob3lkaGV5aGVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTU5ODMyMTQsImV4cCI6MjAzMTU1OTIxNH0.mZRzeMwFjUBlAsvMvOzOogWwuLjaqgcA16OfttjxCaU';
 
 const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
   const [files, setFiles] = useState<File[]>([]);
@@ -148,9 +152,12 @@ const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
 
       console.log("Sending request to Supabase Edge Function...");
       
-      // Using your deployed Supabase Edge Function
+      // Using your deployed Supabase Edge Function with authorization header
       const response = await fetch('https://weqtpuyuizhoydheyheo.supabase.co/functions/v1/convert-to-pdf', {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        },
         body: formData,
       });
 
