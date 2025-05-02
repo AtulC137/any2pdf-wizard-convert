@@ -210,7 +210,7 @@ serve(async (req) => {
               
               <h3>Troubleshooting</h3>
               <ul>
-                <li>Check the function logs in your Supabase dashboard under Functions > Logs</li>
+                <li>Check the function logs in your Supabase dashboard under Functions {`>`} Logs</li>
                 <li>Ensure CORS is properly configured (included in the function code above)</li>
                 <li>Verify that the file formats you're trying to convert are supported</li>
               </ul>

@@ -132,7 +132,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
         formData.append(`file-${index}`, file);
       });
 
-      // Update with your actual Supabase project URL from the dashboard
+      // Using your deployed Supabase Edge Function
       const response = await fetch('https://weqtpuyuizhoydheyheo.supabase.co/functions/v1/convert-to-pdf', {
         method: 'POST',
         body: formData,
