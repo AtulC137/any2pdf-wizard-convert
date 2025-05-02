@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useRef } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,9 @@ interface FileUploadProps {
 
 // Supabase anon key - this is safe to expose in the client
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlcXRwdXl1aXpob3lkaGV5aGVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTU5ODMyMTQsImV4cCI6MjAzMTU1OTIxNH0.mZRzeMwFjUBlAsvMvOzOogWwuLjaqgcA16OfttjxCaU';
+
+// Toggle this to true to use mock conversion (for testing when backend isn't available)
+const USE_MOCK_CONVERSION = true; 
 
 const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
   const [files, setFiles] = useState<File[]>([]);
@@ -119,6 +121,23 @@ const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
     setConvertedFileUrl(null);
   };
 
+  // Mock conversion function for testing when backend is not available
+  const mockConversion = async () => {
+    // Simulate network delay and processing time
+    const mockDuration = 3000; // 3 seconds
+    const updateInterval = 100; // Update progress every 100ms
+    const steps = mockDuration / updateInterval;
+    
+    for (let i = 0; i <= steps; i++) {
+      await new Promise(resolve => setTimeout(resolve, updateInterval));
+      setConversionProgress(Math.min(100, Math.round((i / steps) * 100)));
+    }
+    
+    // Create a simple PDF-like blob
+    const mockPdfBlob = new Blob(['%PDF-1.5 Mock PDF content'], { type: 'application/pdf' });
+    return mockPdfBlob;
+  };
+
   const handleConvert = async () => {
     if (files.length === 0) {
       toast({
@@ -150,36 +169,50 @@ const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
         console.log(`Added file to FormData: ${file.name} (${file.type}, ${file.size} bytes)`);
       });
 
-      console.log("Sending request to Supabase Edge Function...");
+      let pdfBlob;
       
-      // Using your deployed Supabase Edge Function with authorization header
-      const response = await fetch('https://weqtpuyuizhoydheyheo.supabase.co/functions/v1/convert-to-pdf', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        },
-        body: formData,
-      });
-
-      clearInterval(progressInterval);
-
-      console.log("Response received:", response.status, response.statusText);
-      
-      if (!response.ok) {
-        // Try to get more error details if available
-        let errorData;
-        try {
-          errorData = await response.json();
-          console.error("Error details:", errorData);
-        } catch (e) {
-          console.error("Could not parse error response:", e);
-        }
+      if (USE_MOCK_CONVERSION) {
+        console.log("Using mock conversion (backend not required)");
+        pdfBlob = await mockConversion();
+      } else {
+        console.log("Sending request to Supabase Edge Function...");
         
-        throw new Error(`Conversion failed: ${response.status} ${response.statusText}${errorData ? ' - ' + JSON.stringify(errorData) : ''}`);
-      }
+        try {
+          // Using your deployed Supabase Edge Function with authorization header
+          const response = await fetch('https://weqtpuyuizhoydheyheo.supabase.co/functions/v1/convert-to-pdf', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+              'Content-Type': 'multipart/form-data', // Add proper content type
+            },
+            body: formData,
+          });
 
-      // Get the PDF blob from the response
-      const pdfBlob = await response.blob();
+          console.log("Response received:", response.status, response.statusText);
+          
+          if (!response.ok) {
+            // Try to get more error details if available
+            let errorData;
+            try {
+              errorData = await response.json();
+              console.error("Error details:", errorData);
+            } catch (e) {
+              console.error("Could not parse error response:", e);
+            }
+            
+            throw new Error(`Conversion failed: ${response.status} ${response.statusText}${errorData ? ' - ' + JSON.stringify(errorData) : ''}`);
+          }
+
+          // Get the PDF blob from the response
+          pdfBlob = await response.blob();
+        } catch (fetchError) {
+          console.error("Fetch error:", fetchError);
+          throw new Error(`Connection failed: The backend service is not available. Please check that the Supabase Edge Function is deployed.`);
+        }
+      }
+      
+      clearInterval(progressInterval);
+      
       console.log("PDF blob received:", pdfBlob.size, "bytes,", pdfBlob.type);
       
       // Create a URL for the blob
@@ -193,7 +226,9 @@ const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
         setIsConverted(true);
         toast({
           title: "Success!",
-          description: "Conversion complete! Your PDF is ready to download.",
+          description: USE_MOCK_CONVERSION ? 
+            "Mock conversion complete! This is a test PDF." : 
+            "Conversion complete! Your PDF is ready to download.",
         });
       }, 500);
       
@@ -235,6 +270,11 @@ const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
             <p className="text-lg text-gray-600">
               Drag and drop your files or click to browse. We'll convert them to PDF instantly.
             </p>
+            {USE_MOCK_CONVERSION && (
+              <div className="mt-2 p-2 bg-amber-100 text-amber-700 rounded-md text-sm">
+                Running in demo mode. Backend not required.
+              </div>
+            )}
           </div>
 
           <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
