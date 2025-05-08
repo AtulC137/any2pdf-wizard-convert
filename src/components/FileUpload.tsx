@@ -183,7 +183,6 @@ const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-              'Content-Type': 'multipart/form-data', // Add proper content type
             },
             body: formData,
           });
@@ -226,9 +225,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
         setIsConverted(true);
         toast({
           title: "Success!",
-          description: USE_MOCK_CONVERSION ? 
-            "Mock conversion complete! This is a test PDF." : 
-            "Conversion complete! Your PDF is ready to download.",
+          description: "Conversion complete! Your PDF is ready to download.",
         });
       }, 500);
       
@@ -270,11 +267,6 @@ const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
             <p className="text-lg text-gray-600">
               Drag and drop your files or click to browse. We'll convert them to PDF instantly.
             </p>
-            {USE_MOCK_CONVERSION && (
-              <div className="mt-2 p-2 bg-amber-100 text-amber-700 rounded-md text-sm">
-                Running in demo mode. Backend not required.
-              </div>
-            )}
           </div>
 
           <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
