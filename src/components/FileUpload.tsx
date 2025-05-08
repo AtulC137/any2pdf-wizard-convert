@@ -9,11 +9,8 @@ interface FileUploadProps {
   id: string;
 }
 
-// Supabase anon key - this is safe to expose in the client
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlcXRwdXl1aXpob3lkaGV5aGVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTU5ODMyMTQsImV4cCI6MjAzMTU1OTIxNH0.mZRzeMwFjUBlAsvMvOzOogWwuLjaqgcA16OfttjxCaU';
-
-// Toggle this to true to use mock conversion (for testing when backend isn't available)
-const USE_MOCK_CONVERSION = true; 
+// Change this to your backend URL
+const BACKEND_URL = 'http://localhost:5000/convert-to-pdf';
 
 const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
   const [files, setFiles] = useState<File[]>([]);
@@ -121,23 +118,6 @@ const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
     setConvertedFileUrl(null);
   };
 
-  // Mock conversion function for testing when backend is not available
-  const mockConversion = async () => {
-    // Simulate network delay and processing time
-    const mockDuration = 3000; // 3 seconds
-    const updateInterval = 100; // Update progress every 100ms
-    const steps = mockDuration / updateInterval;
-    
-    for (let i = 0; i <= steps; i++) {
-      await new Promise(resolve => setTimeout(resolve, updateInterval));
-      setConversionProgress(Math.min(100, Math.round((i / steps) * 100)));
-    }
-    
-    // Create a simple PDF-like blob
-    const mockPdfBlob = new Blob(['%PDF-1.5 Mock PDF content'], { type: 'application/pdf' });
-    return mockPdfBlob;
-  };
-
   const handleConvert = async () => {
     if (files.length === 0) {
       toast({
@@ -162,72 +142,60 @@ const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
 
       console.log("Starting file conversion. Files to convert:", files.map(f => ({ name: f.name, type: f.type, size: f.size })));
 
-      // For each file, create a FormData object to send to the Supabase Edge Function
+      // For each file, create a FormData object to send to the backend
       const formData = new FormData();
       files.forEach((file, index) => {
-        formData.append(`file-${index}`, file);
+        formData.append('files', file);
         console.log(`Added file to FormData: ${file.name} (${file.type}, ${file.size} bytes)`);
       });
 
-      let pdfBlob;
+      console.log("Sending request to backend API...");
       
-      if (USE_MOCK_CONVERSION) {
-        console.log("Using mock conversion (backend not required)");
-        pdfBlob = await mockConversion();
-      } else {
-        console.log("Sending request to Supabase Edge Function...");
-        
-        try {
-          // Using your deployed Supabase Edge Function with authorization header
-          const response = await fetch('https://weqtpuyuizhoydheyheo.supabase.co/functions/v1/convert-to-pdf', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-            },
-            body: formData,
-          });
-
-          console.log("Response received:", response.status, response.statusText);
-          
-          if (!response.ok) {
-            // Try to get more error details if available
-            let errorData;
-            try {
-              errorData = await response.json();
-              console.error("Error details:", errorData);
-            } catch (e) {
-              console.error("Could not parse error response:", e);
-            }
-            
-            throw new Error(`Conversion failed: ${response.status} ${response.statusText}${errorData ? ' - ' + JSON.stringify(errorData) : ''}`);
-          }
-
-          // Get the PDF blob from the response
-          pdfBlob = await response.blob();
-        } catch (fetchError) {
-          console.error("Fetch error:", fetchError);
-          throw new Error(`Connection failed: The backend service is not available. Please check that the Supabase Edge Function is deployed.`);
-        }
-      }
-      
-      clearInterval(progressInterval);
-      
-      console.log("PDF blob received:", pdfBlob.size, "bytes,", pdfBlob.type);
-      
-      // Create a URL for the blob
-      const pdfUrl = URL.createObjectURL(pdfBlob);
-      setConvertedFileUrl(pdfUrl);
-      
-      // Set conversion state to complete
-      setConversionProgress(100);
-      setTimeout(() => {
-        setIsConverting(false);
-        setIsConverted(true);
-        toast({
-          title: "Success!",
-          description: "Conversion complete! Your PDF is ready to download.",
+      try {
+        const response = await fetch(BACKEND_URL, {
+          method: 'POST',
+          body: formData,
         });
-      }, 500);
+
+        console.log("Response received:", response.status, response.statusText);
+        
+        if (!response.ok) {
+          // Try to get more error details if available
+          let errorData;
+          try {
+            errorData = await response.json();
+            console.error("Error details:", errorData);
+          } catch (e) {
+            console.error("Could not parse error response:", e);
+          }
+          
+          throw new Error(`Conversion failed: ${response.status} ${response.statusText}${errorData ? ' - ' + JSON.stringify(errorData) : ''}`);
+        }
+
+        // Get the PDF blob from the response
+        const pdfBlob = await response.blob();
+        console.log("PDF blob received:", pdfBlob.size, "bytes,", pdfBlob.type);
+        
+        // Create a URL for the blob
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        setConvertedFileUrl(pdfUrl);
+        
+        // Set conversion state to complete
+        clearInterval(progressInterval);
+        setConversionProgress(100);
+        setTimeout(() => {
+          setIsConverting(false);
+          setIsConverted(true);
+          toast({
+            title: "Success!",
+            description: "Conversion complete! Your PDF is ready to download.",
+          });
+        }, 500);
+      } catch (fetchError) {
+        clearInterval(progressInterval);
+        console.error("Fetch error:", fetchError);
+        throw new Error(`Connection failed: The backend service is not available. Please make sure your backend server is running at ${BACKEND_URL}`);
+      }
       
     } catch (error) {
       console.error("Conversion error:", error);
@@ -382,6 +350,12 @@ const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
 
           <div className="text-center text-sm text-gray-500">
             <p>Your files are secure and will be automatically deleted after conversion.</p>
+          </div>
+
+          <div className="text-center mt-6 p-4 bg-blue-50 rounded-lg">
+            <p className="text-sm text-blue-600">
+              <strong>Note:</strong> Make sure your backend server is running on {BACKEND_URL} before attempting conversion.
+            </p>
           </div>
         </div>
       </div>
