@@ -9,8 +9,8 @@ interface FileUploadProps {
   id: string;
 }
 
-// Change this to your backend URL
-const BACKEND_URL = 'http://localhost:5000/convert-to-pdf';
+// Backend deployment URL
+const BACKEND_URL = 'https://any2pdf-wizard-convert.onrender.com/convert-to-pdf';
 
 const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
   const [files, setFiles] = useState<File[]>([]);
@@ -194,7 +194,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
       } catch (fetchError) {
         clearInterval(progressInterval);
         console.error("Fetch error:", fetchError);
-        throw new Error(`Connection failed: The backend service is not available. Please make sure your backend server is running at ${BACKEND_URL}`);
+        throw new Error(`Connection failed: The backend service is not available. Please check your network connection.`);
       }
       
     } catch (error) {
@@ -354,7 +354,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ id }) => {
 
           <div className="text-center mt-6 p-4 bg-blue-50 rounded-lg">
             <p className="text-sm text-blue-600">
-              <strong>Note:</strong> Make sure your backend server is running on {BACKEND_URL} before attempting conversion.
+              <strong>Note:</strong> Files are processed on our secure server and automatically deleted after conversion.
             </p>
           </div>
         </div>
